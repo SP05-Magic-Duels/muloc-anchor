@@ -275,7 +275,7 @@ void loop() {
   if (anchor_state == ANCHOR_LISTEN) {
     DW1000Ng::setPreambleDetectionTimeout(0);
     /* Clear reception timeout to start next ranging process. */
-    DW1000Ng::setReceiveFrameWaitTimeoutPeriod(0);
+    DW1000Ng::setReceiveFrameWaitTimeoutPeriod(RX_TIMEOUT);
     /* Activate reception immediately. */
     DW1000Ng::startReceive();
   }
