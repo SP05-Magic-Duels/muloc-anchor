@@ -50,10 +50,18 @@
 #include <DW1000Ng.hpp>
 #include <DW1000NgUtils.hpp>
 
+// Debugging
+#define TRACE_ENABLE 1
+
+#if (TRACE_ENABLE == 1)
+#define DEBUG_LOG_TRACE(msg, var) Serial.print(msg); Serial.println(var);
+#else
+#define DEBUG_LOG_TRACE(msg, var) {};
+#endif
 
 // Number of anchors used in the system
-#define ANCHOR_NUM 4
-#define ANCHOR_ID 0
+#define ANCHOR_NUM 2
+#define ANCHOR_ID 1
 
 const uint8_t PIN_RST = 27;  // reset pin
 const uint8_t PIN_IRQ = 34;  // irq pin
@@ -267,16 +275,19 @@ void setup() {
     DW1000Ng::setWait4Response(RX_AFTER_TX_DELAY);
     DW1000Ng::setPreambleDetectionTimeout(0);
     DW1000Ng::setReceiveFrameWaitTimeoutPeriod(RX_TIMEOUT);
+    DEBUG_LOG_TRACE("Anchor ID is 0, state is SEND. About to start transmit.", "")
     DW1000Ng::startTransmit();  // TODO: missing flag DWT_RESPONSE_EXPECTED. looks like the lib auto sets it if you call wait4resp?
   }
 }
 
 void loop() {
+  DEBUG_LOG_TRACE("In main loop.", "")
   if (anchor_state == ANCHOR_LISTEN) {
     DW1000Ng::setPreambleDetectionTimeout(0);
     /* Clear reception timeout to start next ranging process. */
     DW1000Ng::setReceiveFrameWaitTimeoutPeriod(RX_TIMEOUT);
     /* Activate reception immediately. */
+    DEBUG_LOG_TRACE("Anchor state is LISTEN. About to start receive.", "")
     DW1000Ng::startReceive();
   }
 
@@ -289,7 +300,10 @@ void loop() {
     anchor_state = ANCHOR_LISTEN;
   }
 
+  DEBUG_LOG_TRACE("Reception completed (or failed). Anchor state is now: ", anchor_state)
+
   if (isDone) {
+    DEBUG_LOG_TRACE("in isDone loop- isDone is ", isDone)
     err_num = 0;
     rec_cnt++;
 
@@ -315,15 +329,16 @@ void loop() {
 
     // It's our turn to send a message. We should send later if we are anchor 0 and it's time for hooping
     if (((current_tx + 1) % ANCHOR_NUM == ANCHOR_ID) && !((0 == ANCHOR_ID) && (frame_seq_nb % 2 == 1))) {
+      DEBUG_LOG_TRACE("It is now time to send a message. Current tx: ", current_tx)
       // Time delay between the messages from different anchors
       uint32_t delay_time;
       uint32_t tx_time;
 
       // If we are anchor 0, the frame number should +1 and the delay time should be set to DELAY_TIME_TURN
       if (0 == ANCHOR_ID) {
-
         delay_time = DELAY_TIME_TURN;
         frame_seq_nb++;
+        DEBUG_LOG_TRACE("This is anchor zero- add a delay and increment frame_seq_nb- now ", frame_seq_nb)
       } else {
         delay_time = DELAY_TIME;
       }
@@ -343,11 +358,13 @@ void loop() {
       DW1000Ng::setWait4Response(RX_AFTER_TX_DELAY);
 
       if ((ANCHOR_ID + 1 == ANCHOR_NUM) && (frame_seq_nb % 2 == 1)) {
+        DEBUG_LOG_TRACE("Last anchor about to transmit", "")
         // If we are the last anchor and should perform hopping, we should not start reception before hopping.
         DW1000Ng::setWait4Response(0);  // clears w4r so it won't automatically start listening
         DW1000Ng::startTransmit(TransmitMode::DELAYED);
         is_last_anchor = 1;
       } else {
+        DEBUG_LOG_TRACE("Anchor (not last) about to transmit", "")
         DW1000Ng::startTransmit(TransmitMode::DELAYED);
         anchor_state = ANCHOR_SEND;
       }
@@ -356,6 +373,8 @@ void loop() {
         is_last_anchor = 1;
       }
     }
+
+    DEBUG_LOG_TRACE("Sending done. Now reading data from UWB chip", "")
 
     phase_cal = DW1000Ng::getRawTemperature();  // TODO: verify that this is the right byte!
     maxGC = DW1000Ng::getCirPwrBytes();
@@ -399,6 +418,7 @@ void loop() {
       // The last anchor should write buffer after transmission
       is_last_anchor = 0;
 
+
       // Copy the payload to the sending buffer
       for (int i = 10; i < sizeof(sending_msg); i++) {
         // The first 10 bytes in UWB message are MAC
@@ -409,8 +429,10 @@ void loop() {
 
       // It's time for hopping
       if (frame_seq_nb % 2 == 1 && anchor_state != ANCHOR_SEND) {
+        DEBUG_LOG_TRACE("Time to frequency hop. current_freq: ", current_freq)
 
         if (ANCHOR_ID + 1 == ANCHOR_NUM) {
+          DEBUG_LOG_TRACE("This is the last anchor. Waiting for transmit to finish. ANCHOR_ID: ", ANCHOR_ID)
           // If we are the last anchor, we should not start hopping until the message is successfully sent
           while (!(DW1000Ng::isTransmitDone())) {};
         }
@@ -430,8 +452,10 @@ void loop() {
           set_tx_config(TX_CONFIG::CH_2);
         }
 
-        if (ANCHOR_ID + 1 == ANCHOR_NUM) {
+        DEBUG_LOG_TRACE("Finished freqency hop. New current_freq: ", current_freq)
 
+        if (ANCHOR_ID + 1 == ANCHOR_NUM) {
+          DEBUG_LOG_TRACE("Last anchor now receiving after hopping...", "")
           DW1000Ng::setPreambleDetectionTimeout(0);
           /* Clear reception timeout to start next ranging process. */
           DW1000Ng::setReceiveFrameWaitTimeoutPeriod(RX_TIMEOUT);
@@ -442,7 +466,7 @@ void loop() {
 
         if (0 == ANCHOR_ID) {
           // If we are anchor 0, we should start transmission after hopping
-
+          DEBUG_LOG_TRACE("Anchor 0 now about to transmit... (waited for after hopping)...", "")
           // Time delay between the messages from different anchors
           uint32_t delay_time;
           uint32_t tx_time;
@@ -476,6 +500,7 @@ void loop() {
     }
   } else {
     err_num++;
+    DEBUG_LOG_TRACE("isDone false- message reception failed. New err_num: ", err_num)
 
     // Handling packet loss
     if (0 == ANCHOR_ID) {
@@ -490,6 +515,7 @@ void loop() {
         DW1000Ng::forceTRxOff();
         DW1000Ng::applyConfiguration(CONFIG_1);
         set_tx_config(TX_CONFIG::CH_2);
+        DEBUG_LOG_TRACE("Anchor 0 + >= 1 err_num: reset count and set current_freq to 1", "")
       } else {
         delay(3);
       }
@@ -508,6 +534,7 @@ void loop() {
       DW1000Ng::setPreambleDetectionTimeout(0);
 
       // Start transmission immediately
+      DEBUG_LOG_TRACE("Anchor 0 about to transmit", "")
       DW1000Ng::startTransmit();
     } else {
       // Hopping Now! If received more than ANCHOR_NUM-2 messages
@@ -521,8 +548,11 @@ void loop() {
         DW1000Ng::forceTRxOff();
         DW1000Ng::applyConfiguration(CONFIG_1);
         set_tx_config(TX_CONFIG::CH_2);
+        DEBUG_LOG_TRACE("Not anchor 0 + >= 1 err_num: reset count and set current_freq to 1", "")
       }
       DW1000Ng::clearReceiveFailedStatus();
     }
+    DEBUG_LOG_TRACE("End of message reception failed clause.", "")
   }
+  DEBUG_LOG_TRACE("End of loop", "")
 }
