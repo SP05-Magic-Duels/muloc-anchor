@@ -61,7 +61,7 @@
 
 // Number of anchors used in the system
 #define ANCHOR_NUM 2
-#define ANCHOR_ID 1
+#define ANCHOR_ID 0
 
 const uint8_t PIN_RST = 27;  // reset pin
 const uint8_t PIN_IRQ = 34;  // irq pin
@@ -293,7 +293,8 @@ void loop() {
 
   // Waiting for reception completion
   bool isDone = false;
-  while (!((isDone = DW1000Ng::isReceiveDone()) || DW1000Ng::isReceiveFailed())) {}
+  while (!((isDone = DW1000Ng::isReceiveDone()) || DW1000Ng::isReceiveFailed() || DW1000Ng::isReceiveTimeout())) {
+  }
 
   // If the anchor have received the message, then change it to listening state
   if (anchor_state == ANCHOR_SEND) {
