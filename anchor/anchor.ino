@@ -182,7 +182,6 @@ void dw_init() {
 
   DW1000Ng::applyConfiguration(CONFIG_1);
   set_tx_config(TX_CONFIG::CH_2);
-
   DW1000Ng::enableLedBlinking();
 
   // TODO: make sure no addr conflicts?
@@ -277,11 +276,13 @@ void setup() {
     DW1000Ng::setReceiveFrameWaitTimeoutPeriod(RX_TIMEOUT);
     DEBUG_LOG_TRACE("Anchor ID is 0, state is SEND. About to start transmit.", "")
     DW1000Ng::startTransmit();  // TODO: missing flag DWT_RESPONSE_EXPECTED. looks like the lib auto sets it if you call wait4resp?
+    DEBUG_LOG_TRACE("Transmit status done?", DW1000Ng::isTransmitDone())
   }
 }
 
 void loop() {
   DEBUG_LOG_TRACE("In main loop.", "")
+  DEBUG_LOG_TRACE("Transmit status done? ", DW1000Ng::isTransmitDone())
   if (anchor_state == ANCHOR_LISTEN) {
     DW1000Ng::setPreambleDetectionTimeout(0);
     /* Clear reception timeout to start next ranging process. */
@@ -293,7 +294,7 @@ void loop() {
 
   // Waiting for reception completion
   bool isDone = false;
-  while (!((isDone = DW1000Ng::isReceiveDone()) || DW1000Ng::isReceiveFailed())) {}
+  while (!((isDone = DW1000Ng::isReceiveDone()) || DW1000Ng::isReceiveFailed() || DW1000Ng::isReceiveTimeout())) {}
 
   // If the anchor have received the message, then change it to listening state
   if (anchor_state == ANCHOR_SEND) {
@@ -374,7 +375,7 @@ void loop() {
       }
     }
 
-    DEBUG_LOG_TRACE("Sending done. Now reading data from UWB chip", "")
+    // DEBUG_LOG_TRACE("Sending done. Now reading data from UWB chip", "")
 
     phase_cal = DW1000Ng::getRawTemperature();  // TODO: verify that this is the right byte!
     maxGC = DW1000Ng::getCirPwrBytes();
@@ -500,7 +501,7 @@ void loop() {
     }
   } else {
     err_num++;
-    DEBUG_LOG_TRACE("isDone false- message reception failed. New err_num: ", err_num)
+    // DEBUG_LOG_TRACE("isDone false- message reception failed. New err_num: ", err_num)
 
     // Handling packet loss
     if (0 == ANCHOR_ID) {
@@ -515,7 +516,7 @@ void loop() {
         DW1000Ng::forceTRxOff();
         DW1000Ng::applyConfiguration(CONFIG_1);
         set_tx_config(TX_CONFIG::CH_2);
-        DEBUG_LOG_TRACE("Anchor 0 + >= 1 err_num: reset count and set current_freq to 1", "")
+        // DEBUG_LOG_TRACE("Anchor 0 + >= 1 err_num: reset count and set current_freq to 1", "")
       } else {
         delay(3);
       }
@@ -534,7 +535,7 @@ void loop() {
       DW1000Ng::setPreambleDetectionTimeout(0);
 
       // Start transmission immediately
-      DEBUG_LOG_TRACE("Anchor 0 about to transmit", "")
+      // DEBUG_LOG_TRACE("Anchor 0 about to transmit", "")
       DW1000Ng::startTransmit();
     } else {
       // Hopping Now! If received more than ANCHOR_NUM-2 messages
@@ -548,11 +549,11 @@ void loop() {
         DW1000Ng::forceTRxOff();
         DW1000Ng::applyConfiguration(CONFIG_1);
         set_tx_config(TX_CONFIG::CH_2);
-        DEBUG_LOG_TRACE("Not anchor 0 + >= 1 err_num: reset count and set current_freq to 1", "")
+        // DEBUG_LOG_TRACE("Not anchor 0 + >= 1 err_num: reset count and set current_freq to 1", "")
       }
       DW1000Ng::clearReceiveFailedStatus();
     }
-    DEBUG_LOG_TRACE("End of message reception failed clause.", "")
+    // DEBUG_LOG_TRACE("End of message reception failed clause.", "")
   }
-  DEBUG_LOG_TRACE("End of loop", "")
+  // DEBUG_LOG_TRACE("End of loop", "")
 }
