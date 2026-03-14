@@ -60,8 +60,8 @@
 #endif
 
 // Number of anchors used in the system
-#define ANCHOR_NUM 2
-#define ANCHOR_ID 1
+#define ANCHOR_NUM 4
+#define ANCHOR_ID 0
 
 const uint8_t PIN_RST = 27;  // reset pin
 const uint8_t PIN_IRQ = 34;  // irq pin
@@ -209,6 +209,10 @@ void dw_init() {
   DW1000Ng::getPrintableDeviceMode(msg);
   Serial.print("Device mode: ");
   Serial.println(msg);
+  Serial.print("ANCHOR_ID: ");
+  Serial.println(ANCHOR_ID);
+  Serial.print("ANCHOR_NUM: ");
+  Serial.println(ANCHOR_NUM);
 }
 
 static uint8_t anchor_state = ANCHOR_LISTEN;
@@ -281,14 +285,14 @@ void setup() {
 }
 
 void loop() {
-  DEBUG_LOG_TRACE("In main loop.", "")
-  DEBUG_LOG_TRACE("Transmit status done? ", DW1000Ng::isTransmitDone())
+  // DEBUG_LOG_TRACE("In main loop.", "")
+  // DEBUG_LOG_TRACE("Transmit status done? ", DW1000Ng::isTransmitDone())
   if (anchor_state == ANCHOR_LISTEN) {
     DW1000Ng::setPreambleDetectionTimeout(0);
     /* Clear reception timeout to start next ranging process. */
     DW1000Ng::setReceiveFrameWaitTimeoutPeriod(RX_TIMEOUT);
     /* Activate reception immediately. */
-    DEBUG_LOG_TRACE("Anchor state is LISTEN. About to start receive.", "")
+    // DEBUG_LOG_TRACE("Anchor state is LISTEN. About to start receive.", "")
     DW1000Ng::startReceive();
   }
 
@@ -301,7 +305,7 @@ void loop() {
     anchor_state = ANCHOR_LISTEN;
   }
 
-  DEBUG_LOG_TRACE("Reception completed (or failed). Anchor state is now: ", anchor_state)
+  // DEBUG_LOG_TRACE("Reception completed (or failed). Anchor state is now: ", anchor_state)
 
   if (isDone) {
     DEBUG_LOG_TRACE("in isDone loop- isDone is ", isDone)
@@ -318,6 +322,10 @@ void loop() {
     current_tx = rx_buffer[8];
     frame_seq_nb = rx_buffer[ALL_MSG_SN_IDX];
     rx_ts = DW1000Ng::getReceiveTimestamp();
+    DEBUG_LOG_TRACE("received current_tx: ", current_tx);
+    DEBUG_LOG_TRACE("frame_seq_nb: ", frame_seq_nb);
+    DEBUG_LOG_TRACE("rx_tx: ", rx_ts);
+    
 
     // Copy the receiving timestamps into buffer
     if (current_tx < ANCHOR_ID) {
@@ -380,6 +388,9 @@ void loop() {
     phase_cal = DW1000Ng::getRawTemperature();  // TODO: verify that this is the right byte!
     maxGC = DW1000Ng::getCirPwrBytes();
     rxPC = DW1000Ng::getPreambleAccumulationCount();
+    DEBUG_LOG_TRACE("phase_cal: ", phase_cal);
+    DEBUG_LOG_TRACE("maxGC: ", maxGC);
+    DEBUG_LOG_TRACE("rxPC: ", rxPC);
 
     // Read the first path CIR and save it to local buffer
     uint16_t fp_index = DW1000Ng::getFPPathIdx();
@@ -557,3 +568,4 @@ void loop() {
   }
   // DEBUG_LOG_TRACE("End of loop", "")
 }
+
