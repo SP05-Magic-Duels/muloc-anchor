@@ -61,7 +61,7 @@
 
 // Number of anchors used in the system
 #define ANCHOR_NUM 4
-#define ANCHOR_ID 0
+#define ANCHOR_ID 1
 
 const uint8_t PIN_RST = 27;  // reset pin
 const uint8_t PIN_IRQ = 34;  // irq pin
@@ -510,7 +510,13 @@ void loop() {
         }
       }
     }
-  } else {
+  } else if (DW1000Ng::isReceiveTimeout()) { // Just restart loop
+      DEBUG_LOG_TRACE("Timeout!", "")
+      DW1000Ng::clearReceiveFailedStatus();
+      return;
+
+  } else { // Some other error
+
     err_num++;
     // DEBUG_LOG_TRACE("isDone false- message reception failed. New err_num: ", err_num)
 
@@ -546,7 +552,7 @@ void loop() {
       DW1000Ng::setPreambleDetectionTimeout(0);
 
       // Start transmission immediately
-      // DEBUG_LOG_TRACE("Anchor 0 about to transmit", "")
+      DEBUG_LOG_TRACE("Anchor 0 about to transmit in error clause", "")
       DW1000Ng::startTransmit();
     } else {
       // Hopping Now! If received more than ANCHOR_NUM-2 messages
@@ -564,7 +570,7 @@ void loop() {
       }
       DW1000Ng::clearReceiveFailedStatus();
     }
-    // DEBUG_LOG_TRACE("End of message reception failed clause.", "")
+    DEBUG_LOG_TRACE("End of message reception failed clause.", "")
   }
   // DEBUG_LOG_TRACE("End of loop", "")
 }
